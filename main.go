@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strings"
 	"path/filepath"
+	"strings"
 
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 
@@ -97,11 +97,10 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kw := ffmpeg.KwArgs{
+		// "filter:v": "scale=720",
 		"c:a":      "libvorbis",
-		"c:v":      "libtheora",
-		"qscale:a": "3",
-		"qscale:v": "3",
-		"format":   "ogv",
+		"c:v":      "libvpx",
+		"format":   "webm",
 	}
 
 	if !r.Form.Has("nosub") {
@@ -112,7 +111,7 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = &bytes.Buffer{}
-	w.Header().Set("content-type", "video/ogg")
+	w.Header().Set("content-type", "video/webm;codecs=\"vp08.00.41.08,vorbis\"")
 	err := ffmpeg.Input(filename).
 		Output("pipe:1", kw).
 		WithOutput(w, os.Stdout).Run()
