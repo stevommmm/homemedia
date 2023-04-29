@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title></title>
+	<style type="text/css">
+		body {
+			background-color: #242424;
+		}
+		p {
+			display: block;
+		}
+		a {
+			display: inline-block;
+			margin: 0.3rem 1rem;
+		}
+	</style>
+</head>
+<body>
+	<script type="text/javascript">
+		window.addEventListener('load', async function(){
+			const response = await fetch('/list');
+			let data = await response.text();
+			for (let line of data.split('\n')) {
+				if (line == "") {
+					continue;
+				}
+				let n = document.createElement('p');
+				n.appendChild(document.createTextNode(line));
+				
+				let el = document.createElement('a');
+				el.href=`/video?fn=${line}`;
+				el.appendChild(document.createTextNode("[sub]"));
+				n.appendChild(el);
+
+				let el2 = document.createElement('a');
+				el2.href=`/video?fn=${line}&nosub=1`;
+				el2.appendChild(document.createTextNode("[nosub]"));
+				n.appendChild(el2);
+
+				document.body.appendChild(n);
+			}
+		});
+	</script>
+</body>
+</html>
