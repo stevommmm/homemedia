@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -63,6 +63,8 @@ var extensions = map[string]bool{
 	".f4b":  true,
 }
 
+var DataDirectory string
+
 func index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/html")
 	w.Write(indexpage)
@@ -70,7 +72,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 
 func list(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/plain")
-	err := filepath.Walk(".",
+	err := filepath.Walk(DataDirectory,
 		func(fn string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -96,35 +98,53 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, err := filepath.Rel(DataDirectory, filename); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
 	kw := ffmpeg.KwArgs{
 		// "filter:v": "scale=720",
+		"loglevel": "error",
 		"c:a":      "libvorbis",
-		"c:v":      "libvpx",
+		"c:v":      "libvpx-vp9",
+		"deadline": "realtime",
+		"cpu-used": "8",
+		"row-mt":   "1",
 		"format":   "webm",
 	}
 
 	if !r.Form.Has("nosub") {
-		kw["vf"] = fmt.Sprintf("subtitles=%s", filename)
+		kw["vf"] = fmt.Sprintf("subtitles='%s'", filename)
 		if r.Form.Has("si") {
 			kw["vf"] = fmt.Sprint("%s,si=%s", kw["vm"], r.FormValue("si"))
 		}
 	}
 
-	_ = &bytes.Buffer{}
-	w.Header().Set("content-type", "video/webm;codecs=\"vp08.00.41.08,vorbis\"")
-	err := ffmpeg.Input(filename).
+	w.Header().Set("Content-Type", "video/webm;codecs=\"vp9,vorbis\"")
+	w.Header().Set("Content-Disposition", "inline")
+	w.Header().Set("Cache-Control", "no-cache")
+
+	_ = ffmpeg.Input(filename).
 		Output("pipe:1", kw).
 		WithOutput(w, os.Stdout).Run()
-	log.Println(err)
-	log.Println("ffmpeg process1 done")
-	// buf.WriteTo(w)
+}
+
+func logRequest(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s %s\n", r.RemoteAddr, r.Method, r.URL)
+		handler.ServeHTTP(w, r)
+	})
 }
 
 func main() {
+	flag.StringVar(&DataDirectory, "data", ".", "Data location.")
+	flag.Parse()
+
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list", list)
 	http.HandleFunc("/video", encodeVideo)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", logRequest(http.DefaultServeMux)))
 
 }
