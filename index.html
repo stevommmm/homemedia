@@ -66,7 +66,7 @@
 	<form action=/video method=post>
 		<select name=fn></select>
 		<label><input type=checkbox name=nosub value=1>No Subs</label>
-		<label><input type=checkbox id=autonext>Auto Next</label>
+		<label><input type=checkbox id=autonext checked>Auto Next</label>
 		<label><input type=number min=0 name=si value="0">Sub index</label>
 		<input type=submit>
 	</form>
@@ -102,9 +102,9 @@
 				let v = document.querySelector('video');
 				v.addEventListener("loadeddata", (ev) => { v.play(); });
 				v.addEventListener("ended", (event) => { 
-					if document.querySelector('#autonext').checked {
+					if (document.querySelector('#autonext').checked === true) {
 						sel.selectedIndex++;
-						form.submit();
+						form.requestSubmit();
 					}
 				});
 
