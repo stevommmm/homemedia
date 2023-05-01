@@ -66,14 +66,18 @@
 	<form action=/video method=post>
 		<select name=fn></select>
 		<label><input type=checkbox name=nosub value=1>No Subs</label>
+		<label><input type=checkbox id=autonext>Auto Next</label>
 		<label><input type=number min=0 name=si value="0">Sub index</label>
 		<input type=submit>
 	</form>
 	<script type="text/javascript">
-		window.addEventListener('load', async function(){
+		window.addEventListener('load', async () => {
 			const response = await fetch('/list');
 			let data = await response.text();
-			let sel = document.querySelector('select');
+
+			const form = document.querySelector('form');
+			const sel = document.querySelector('select');
+
 			for (let line of data.split('\n')) {
 				if (line == "") {
 					continue;
@@ -84,7 +88,7 @@
 				sel.appendChild(o);
 			}
 
-			document.querySelector('form').addEventListener('submit', function(e) {
+			form.addEventListener('submit', (e) => {
 				e.preventDefault();
 
 				const fd = new FormData(e.target);
@@ -97,6 +101,12 @@
 
 				let v = document.querySelector('video');
 				v.addEventListener("loadeddata", (ev) => { v.play(); });
+				v.addEventListener("ended", (event) => { 
+					if document.querySelector('#autonext').checked {
+						sel.selectedIndex++;
+						form.submit();
+					}
+				});
 
 				v.pause();
 				v.replaceChildren(src);
