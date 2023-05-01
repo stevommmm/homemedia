@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -103,6 +104,15 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Has local SRT file?
+	subname := filename
+	if ex := path.Ext(filename); ex != "" {
+		srtp := fmt.Sprintf("%s.srt", strings.TrimSuffix(filename, path.Ext(filename)))
+		if fi, err := os.Stat(srtp); err == nil && !fi.IsDir() {
+			subname = srtp
+		}
+	}
+
 	kw := ffmpeg.KwArgs{
 		// "filter:v": "scale=720",
 		"loglevel": "error",
@@ -115,9 +125,9 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !r.Form.Has("nosub") {
-		kw["vf"] = fmt.Sprintf("subtitles='%s'", filename)
+		kw["vf"] = fmt.Sprintf("subtitles=filename='%s'", subname)
 		if r.Form.Has("si") {
-			kw["vf"] = fmt.Sprint("%s,si=%s", kw["vm"], r.FormValue("si"))
+			kw["vf"] = fmt.Sprintf("%s:si=%s", kw["vf"], r.FormValue("si"))
 		}
 	}
 
@@ -125,9 +135,13 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "inline")
 	w.Header().Set("Cache-Control", "no-cache")
 
-	_ = ffmpeg.Input(filename).
-		Output("pipe:1", kw).
-		WithOutput(w, os.Stdout).Run()
+	errb := &bytes.Buffer{}
+
+	_ = ffmpeg.Input(filename).Output("pipe:1", kw).WithOutput(w, errb).Run()
+
+	if errb.Len() > 0 {
+		http.Error(w, errb.String(), http.StatusBadRequest)
+	}
 }
 
 func logRequest(handler http.Handler) http.Handler {

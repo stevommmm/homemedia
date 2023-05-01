@@ -10,55 +10,98 @@
 			color: #d3d3d3;
 			padding: 0;
 			margin: 0;
-			font-size: 18px;
+			font-size: 22px;
 			font-family: monospace;
 		}
-		p {
+		form {
+			max-width: 500px;
+			width: 100%;
+			margin: 0 auto;
+			font-size: 1rem;
+			padding: 1rem;
+			text-align: center;
+		}
+		label{ 
+			display: inline-block; 
+			padding: 0.4rem 1rem;
+			margin: 0.3rem;
+			border: 1px solid #000;
+		}
+		input {
 			display: block;
-			border-bottom: 1px solid #222;
-			background: linear-gradient(#4a4a4a, #444);
-			line-height: 1.5rem;
-			padding: 0.3rem 1rem;
-			margin: 0;
-			display: flex;
-			flex-direction: column;
-			align-content: flex-start;
+			clear: both;
+			font-size: 1rem;
 		}
-		a {
+		label > input {
 			display: inline-block;
-			margin: 0 1rem;
-			color: #f99;
-			align-self: flex-end;
+			margin-right: 1rem;
+			background-color: transparent;
+			border: none;
+			color: #fff;
 		}
-		a:visited {
-			color: #9f9;
+		input[type=number] {
+			width: 3rem;
+		}
+		input[type=submit] {
+			padding: 0.3rem 1rem;
+		}
+		select {
+			font-size: 1rem;
+			display: block;
+			width: 100%;
+		}
+		video {
+			background-color: #000;
+			display: block;
+			width: 100%;
+			height: auto;
+			max-height: 100vh;
+			margin: 0 auto;
+			resize: both;
 		}
 	</style>
 </head>
 <body>
+	<video preload=none controls></video>
+	<form action=/video method=post>
+		<select name=fn></select>
+		<label><input type=checkbox name=nosub value=1>No Subs</label>
+		<label><input type=number min=0 name=si value="0">Sub index</label>
+		<input type=submit>
+	</form>
 	<script type="text/javascript">
 		window.addEventListener('load', async function(){
 			const response = await fetch('/list');
 			let data = await response.text();
+			let sel = document.querySelector('select');
 			for (let line of data.split('\n')) {
 				if (line == "") {
 					continue;
 				}
-				let n = document.createElement('p');
-				n.appendChild(document.createTextNode(line));
-				
-				let el = document.createElement('a');
-				el.href=`/video?fn=${line}`;
-				el.appendChild(document.createTextNode("[sub]"));
-				n.appendChild(el);
-
-				let el2 = document.createElement('a');
-				el2.href=`/video?fn=${line}&nosub=1`;
-				el2.appendChild(document.createTextNode("[nosub]"));
-				n.appendChild(el2);
-
-				document.body.appendChild(n);
+				let o = document.createElement('option');
+				o.value = line;
+				o.appendChild(document.createTextNode(line));
+				sel.appendChild(o);
 			}
+
+			document.querySelector('form').addEventListener('submit', function(e) {
+				e.preventDefault();
+
+				const fd = new FormData(e.target);
+				const ud = new URLSearchParams(fd);
+
+				let src=document.createElement('source');
+				src.src=`/video?${ud.toString()}`;
+				src.type='video/webm';
+				src.addEventListener('error', (ev) => { alert("Cant load media, bad subtitles?") });
+
+				let v = document.querySelector('video');
+				v.addEventListener("loadeddata", (ev) => { v.play(); });
+
+				v.pause();
+				v.replaceChildren(src);
+				v.load();
+			});
 		});
 	</script>
 </body>
