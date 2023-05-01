@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title></title>
+	<title>HomeMedia</title>
 	<style type="text/css">
 		body {
 			background-color: #242424;
@@ -11,49 +11,54 @@
 			padding: 0;
 			margin: 0;
 			font-size: 22px;
-			font-family: monospace;
+			font-family: Verdana, Arial, Helvetica, sans-serif;
 		}
 		form {
-			max-width: 500px;
+			max-width: 600px;
 			width: 100%;
 			margin: 0 auto;
 			font-size: 1rem;
 			padding: 1rem;
-			text-align: center;
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: space-between;
+      		gap: 0.3rem;
 		}
-		label{ 
+		label, input, select { 
 			display: inline-block; 
-			padding: 0.4rem 1rem;
-			margin: 0.3rem;
+			padding: 0.6rem 1rem;
 			border: 1px solid #000;
-		}
-		input {
-			display: block;
-			clear: both;
+			border-radius: 3px;
+			background-color: #333;
+			color: #efefef;
+			line-height: 1.2rem;
 			font-size: 1rem;
 		}
 		label > input {
-			display: inline-block;
 			margin-right: 1rem;
-			background-color: transparent;
-			border: none;
+			padding: 0;
 			color: #fff;
+			border: none;
+			background-color: transparent;
 		}
 		input[type=number] {
 			width: 3rem;
 		}
 		input[type=submit] {
-			padding: 0.3rem 1rem;
+			flex-basis: 100%;
+			padding: 0.7rem 2rem;
+			background-color: #363;
 		}
 		select {
 			font-size: 1rem;
-			display: block;
 			width: 100%;
+			flex-basis: 100%;
 		}
 		video {
+			width: 600px;
 			background-color: #000;
 			display: block;
-			width: 100%;
+			max-width: 100%;
 			height: auto;
 			max-height: 100vh;
 			margin: 0 auto;
@@ -63,12 +68,12 @@
 </head>
 <body>
 	<video preload=none controls></video>
-	<form action=/video method=post>
+	<form>
 		<select name=fn></select>
 		<label><input type=checkbox name=nosub value=1>No Subs</label>
-		<label><input type=checkbox id=autonext checked>Auto Next</label>
+		<label><input type=checkbox id=autonext>Auto Next</label>
 		<label><input type=number min=0 name=si value="0">Sub index</label>
-		<input type=submit>
+		<input type=submit value="Enqueue Video">
 	</form>
 	<script type="text/javascript">
 		window.addEventListener('load', async () => {
