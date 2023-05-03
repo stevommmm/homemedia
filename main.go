@@ -133,14 +133,17 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "video/webm;codecs=\"vp9,vorbis\"")
 	w.Header().Set("Content-Disposition", "inline")
+	w.Header()["Content-Length"] = nil // Stop go helpfully setting it to 0
 	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
 
 	errb := &bytes.Buffer{}
 
 	_ = ffmpeg.Input(filename).Output("pipe:1", kw).WithOutput(w, errb).Run()
 
-	if errb.Len() > 0 {
-		http.Error(w, errb.String(), http.StatusBadRequest)
+	if errb.Len() > 0 && !bytes.Contains(errb.Bytes(), []byte("Broken pipe")) {
+	// if errb.Len() > 0 {
+		log.Println(errb.String())
 	}
 }
 
