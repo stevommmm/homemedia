@@ -117,7 +117,7 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		// "filter:v": "scale=720",
 		"loglevel": "error",
 		"c:a":      "libvorbis",
-		"c:v":      "libvpx-vp9",
+		"c:v":      "libvpx",
 		"deadline": "realtime",
 		"cpu-used": "8",
 		"row-mt":   "1",
@@ -131,7 +131,7 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "video/webm;codecs=\"vp9,vorbis\"")
+	w.Header().Set("Content-Type", "video/webm;codecs=\"vp8,vorbis\"")
 	w.Header().Set("Content-Disposition", "inline")
 	w.Header()["Content-Length"] = nil // Stop go helpfully setting it to 0
 	w.Header().Set("Cache-Control", "no-cache")
