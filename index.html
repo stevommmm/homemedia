@@ -5,6 +5,9 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>HomeMedia</title>
 	<style type="text/css">
+		* {
+			box-sizing: border-box;
+		}
 		body {
 			background-color: #242424;
 			color: #d3d3d3;
@@ -24,7 +27,7 @@
 			justify-content: space-between;
       		gap: 0.3rem;
 		}
-		label, input, select { 
+		label, input, select, button { 
 			display: inline-block; 
 			padding: 0.6rem 1rem;
 			border: 1px solid #000;
@@ -44,10 +47,16 @@
 		input[type=number] {
 			width: 3rem;
 		}
-		input[type=submit] {
-			flex-basis: 100%;
+		input[type=submit], button#stop {
+			margin: 0;
+			flex-basis: 45%;
 			padding: 0.7rem 2rem;
+		}
+		input[type=submit] {
 			background-color: #363;
+		} 
+		button#stop {
+			background-color: #633;
 		}
 		select {
 			font-size: 1rem;
@@ -55,10 +64,9 @@
 			flex-basis: 100%;
 		}
 		video {
-			width: 600px;
+			width: 100%;
 			background-color: #000;
 			display: block;
-			max-width: 100%;
 			height: auto;
 			max-height: 100vh;
 			margin: 0 auto;
@@ -74,14 +82,17 @@
 		<label><input type=checkbox id=autonext>Auto Next</label>
 		<label><input type=number min=0 name=si value="0">Sub index</label>
 		<input type=submit value="Enqueue Video">
+		<button type=button id=stop>Stop</button>
 	</form>
 	<script type="text/javascript">
 		window.addEventListener('load', async () => {
 			const response = await fetch('/list');
 			let data = await response.text();
 
+			const v = document.querySelector('video');
 			const form = document.querySelector('form');
 			const sel = document.querySelector('select');
+			const stopb = document.querySelector('button#stop')
 
 			for (let line of data.split('\n')) {
 				if (line == "") {
@@ -92,6 +103,15 @@
 				o.appendChild(document.createTextNode(line));
 				sel.appendChild(o);
 			}
+
+			stopb.addEventListener('click', (ev) => {
+				v.pause();
+				v.currentTime = 0;
+				while (v.firstChild) {
+					v.removeChild(v.lastChild);
+				}
+				v.load();
+			})
 
 			form.addEventListener('submit', (e) => {
 				e.preventDefault();
@@ -104,7 +124,7 @@
 				src.type='video/webm';
 				src.addEventListener('error', (ev) => { alert("Cant load media, bad subtitles?") });
 
-				let v = document.querySelector('video');
+				
 				v.addEventListener("loadeddata", (ev) => { v.play(); });
 				v.addEventListener("ended", (event) => { 
 					if (document.querySelector('#autonext').checked === true) {
