@@ -27,7 +27,6 @@ var extensions = map[string]bool{
 	".ogv":  true,
 	".ogg":  true,
 	".drc":  true,
-	".gif":  true,
 	".gifv": true,
 	".mng":  true,
 	".avi":  true,
@@ -114,7 +113,9 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kw := ffmpeg.KwArgs{
-		// "filter:v": "scale=720",
+		// "filter:v": "scale=-1:720",
+		"b:v":      "1M",
+		"crf":      "10",
 		"loglevel": "error",
 		"c:a":      "libvorbis",
 		"c:v":      "libvpx",
@@ -142,7 +143,6 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 	_ = ffmpeg.Input(filename).Output("pipe:1", kw).WithOutput(w, errb).Run()
 
 	if errb.Len() > 0 && !bytes.Contains(errb.Bytes(), []byte("Broken pipe")) {
-	// if errb.Len() > 0 {
 		log.Println(errb.String())
 	}
 }
@@ -156,12 +156,13 @@ func logRequest(handler http.Handler) http.Handler {
 
 func main() {
 	flag.StringVar(&DataDirectory, "data", ".", "Data location.")
+	listen := flag.String("listen", ":8080", "Webserver listen address.")
 	flag.Parse()
 
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list", list)
 	http.HandleFunc("/video", encodeVideo)
 
-	log.Fatal(http.ListenAndServe(":8080", logRequest(http.DefaultServeMux)))
+	log.Fatal(http.ListenAndServe(*listen, logRequest(http.DefaultServeMux)))
 
 }
