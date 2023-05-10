@@ -93,6 +93,8 @@
 			const form = document.querySelector('form');
 			const sel = document.querySelector('select');
 			const stopb = document.querySelector('button#stop')
+			const lastplayed = localStorage.getItem("lastplayed");
+
 
 			for (let line of data.split('\n')) {
 				if (line == "") {
@@ -100,6 +102,9 @@
 				}
 				let o = document.createElement('option');
 				o.value = line;
+				if (lastplayed === line) {
+					o.selected = true;
+				}
 				o.appendChild(document.createTextNode(line));
 				sel.appendChild(o);
 			}
@@ -125,7 +130,10 @@
 				src.addEventListener('error', (ev) => { alert("Cant load media, bad subtitles?") });
 
 				
-				v.addEventListener("loadeddata", (ev) => { v.play(); });
+				v.addEventListener("loadeddata", (ev) => {
+					v.play();
+					localStorage.setItem("lastplayed", fd.get('fn'));
+				});
 				v.addEventListener("ended", (event) => { 
 					if (document.querySelector('#autonext').checked === true) {
 						sel.selectedIndex++;
