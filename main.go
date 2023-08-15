@@ -1,17 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
-
-	ffmpeg "github.com/u2takey/ffmpeg-go"
 
 	_ "embed"
 )
@@ -64,6 +62,7 @@ var extensions = map[string]bool{
 }
 
 var DataDirectory string
+var FfmpegBinary string
 
 func index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/html")
@@ -112,25 +111,29 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	kw := ffmpeg.KwArgs{
-		// "filter:v": "scale=-1:720",
-		"b:v":      "1M",
-		"crf":      "10",
-		"loglevel": "error",
-		"c:a":      "libvorbis",
-		"c:v":      "libvpx",
-		"deadline": "realtime",
-		"cpu-used": "8",
-		"row-mt":   "1",
-		"format":   "webm",
+	runcmd := []string{
+		"-i", filename,
+		"-loglevel", "error",
+		"-b:v", "1M",
+		"-crf", "10",
+		"-c:a", "libvorbis",
+		"-c:v", "libvpx",
+		"-deadline", "realtime",
+		"-cpu-used", "8",
+		"-row-mt", "1",
+		"-f", "webm",
 	}
 
 	if !r.Form.Has("nosub") {
-		kw["vf"] = fmt.Sprintf("subtitles=filename='%s'", subname)
+		vf := fmt.Sprintf("subtitles=filename='%s'", subname)
 		if r.Form.Has("si") {
-			kw["vf"] = fmt.Sprintf("%s:si=%s", kw["vf"], r.FormValue("si"))
+			vf = fmt.Sprintf("%s:si=%s", vf, r.FormValue("si"))
 		}
+		runcmd = append(runcmd, vf)
 	}
+
+	// Final output arg
+	runcmd = append(runcmd, "pipe:1")
 
 	w.Header().Set("Content-Type", "video/webm;codecs=\"vp8,vorbis\"")
 	w.Header().Set("Content-Disposition", "inline")
@@ -138,12 +141,12 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
 
-	errb := &bytes.Buffer{}
-
-	_ = ffmpeg.Input(filename).Output("pipe:1", kw).WithOutput(w, errb).Run()
-
-	if errb.Len() > 0 && !bytes.Contains(errb.Bytes(), []byte("Broken pipe")) {
-		log.Println(errb.String())
+	cmd := exec.CommandContext(r.Context(), FfmpegBinary, runcmd...)
+	cmd.Stdout = w
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Println(FfmpegBinary, runcmd)
+		log.Println(err)
 	}
 }
 
@@ -156,6 +159,7 @@ func logRequest(handler http.Handler) http.Handler {
 
 func main() {
 	flag.StringVar(&DataDirectory, "data", ".", "Data location.")
+	flag.StringVar(&FfmpegBinary, "ffmpeg", "ffmpeg", "Ffmpeg invocation command.")
 	listen := flag.String("listen", ":8080", "Webserver listen address.")
 	flag.Parse()
 
@@ -164,5 +168,4 @@ func main() {
 	http.HandleFunc("/video", encodeVideo)
 
 	log.Fatal(http.ListenAndServe(*listen, logRequest(http.DefaultServeMux)))
-
 }
