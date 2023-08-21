@@ -10,6 +10,9 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"mime"
+
+	"golang.org/x/net/webdav"
 
 	_ "embed"
 )
@@ -17,56 +20,17 @@ import (
 //go:embed index.html
 var indexpage []byte
 
-var extensions = map[string]bool{
-	".webm": true,
-	".mkv":  true,
-	".flv":  true,
-	".vob":  true,
-	".ogv":  true,
-	".ogg":  true,
-	".drc":  true,
-	".gifv": true,
-	".mng":  true,
-	".avi":  true,
-	".mts":  true,
-	".m2ts": true,
-	".ts":   true,
-	".mov":  true,
-	".qt":   true,
-	".wmv":  true,
-	".yuv":  true,
-	".rm":   true,
-	".rmvb": true,
-	".viv":  true,
-	".asf":  true,
-	".amv":  true,
-	".mp4":  true,
-	".m4p":  true,
-	".m4v":  true,
-	".mpg":  true,
-	".mp2":  true,
-	".mpeg": true,
-	".mpe":  true,
-	".mpv":  true,
-	".m2v":  true,
-	".svi":  true,
-	".3gp":  true,
-	".3g2":  true,
-	".mxf":  true,
-	".roq":  true,
-	".nsv":  true,
-	".f4v":  true,
-	".f4p":  true,
-	".f4a":  true,
-	".f4b":  true,
-}
-
 var DataDirectory string
 var FfmpegBinary string
+var davHandler *webdav.Handler
 
 func index(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "text/html")
-	w.Write(indexpage)
+	if r.Method == http.MethodGet && r.URL.Path == "/" {
+		w.Header().Set("content-type", "text/html")
+		w.Write(indexpage)
+	} else {
+		davHandler.ServeHTTP(w, r)
+	}
 }
 
 func list(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +44,7 @@ func list(w http.ResponseWriter, r *http.Request) {
 				return nil
 			}
 			ex := path.Ext(fn)
-			if _, ok := extensions[strings.ToLower(ex)]; ok {
+			if strings.HasPrefix(mime.TypeByExtension(ex), "video/") {
 				fmt.Fprintln(w, fn)
 			}
 			return nil
@@ -129,7 +93,7 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		if r.Form.Has("si") {
 			vf = fmt.Sprintf("%s:si=%s", vf, r.FormValue("si"))
 		}
-		runcmd = append(runcmd, vf)
+		runcmd = append(runcmd, "-vf", vf)
 	}
 
 	// Final output arg
@@ -162,6 +126,16 @@ func main() {
 	flag.StringVar(&FfmpegBinary, "ffmpeg", "ffmpeg", "Ffmpeg invocation command.")
 	listen := flag.String("listen", ":8080", "Webserver listen address.")
 	flag.Parse()
+
+	davHandler = &webdav.Handler{
+		FileSystem: webdav.Dir(DataDirectory),
+		LockSystem: webdav.NewMemLS(),
+		Logger: func(r *http.Request, err error) {
+			if err != nil {
+				log.Printf("WEBDAV [%s]: %s, ERROR: %s\n", r.Method, r.URL, err)
+			}
+		},
+	}
 
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list", list)
