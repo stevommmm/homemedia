@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
-	"mime"
 
 	"golang.org/x/net/webdav"
 
@@ -20,6 +21,9 @@ import (
 //go:embed index.html
 var indexpage []byte
 
+//go:embed blank.ass
+var blanksubs []byte
+
 var DataDirectory string
 var FfmpegBinary string
 var davHandler *webdav.Handler
@@ -28,42 +32,55 @@ func index(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		w.Header().Set("content-type", "text/html")
 		w.Write(indexpage)
-	} else {
-		davHandler.ServeHTTP(w, r)
+		return
+	}
+	if r.Method == http.MethodGet {
+		ex := path.Ext(r.URL.Path)
+		if strings.HasPrefix(mime.TypeByExtension(ex), "video/") {
+			EncodeVideo(filepath.Join(DataDirectory, r.URL.Path), w, r)
+			return
+		}
+	}
+
+	davHandler.ServeHTTP(w, r)
+}
+
+func ExtractSubsOrBlank(filename, sub_index string, destination *os.File) {
+	subcmd := exec.CommandContext(context.Background(),
+		FfmpegBinary, "-y",
+		"-i", filename,
+		"-loglevel", "error",
+		"-map", fmt.Sprintf("0:s:%s", sub_index),
+		"-f", "ass",
+		destination.Name())
+	if err := subcmd.Run(); err != nil {
+		log.Println("No subtitles found, writing empty subs.")
+		destination.Write(blanksubs)
 	}
 }
 
-func list(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "text/plain")
-	err := filepath.Walk(DataDirectory,
-		func(fn string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if info.IsDir() {
-				return nil
-			}
-			ex := path.Ext(fn)
-			if strings.HasPrefix(mime.TypeByExtension(ex), "video/") {
-				fmt.Fprintln(w, fn)
-			}
-			return nil
-		})
-	if err != nil {
-		log.Println(err)
-	}
-}
-
-func encodeVideo(w http.ResponseWriter, r *http.Request) {
-	filename := r.FormValue("fn")
+func EncodeVideo(filename string, w http.ResponseWriter, r *http.Request) {
 	if filename == "" {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
 	if _, err := filepath.Rel(DataDirectory, filename); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
+	}
+
+	extsub, err := os.CreateTemp("", "sub*")
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	defer extsub.Close()
+	defer os.Remove(extsub.Name())
+
+	sub_index := r.FormValue("si")
+	if sub_index == "" {
+		sub_index = "0"
 	}
 
 	// Has local SRT file?
@@ -72,8 +89,16 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		srtp := fmt.Sprintf("%s.srt", strings.TrimSuffix(filename, path.Ext(filename)))
 		if fi, err := os.Stat(srtp); err == nil && !fi.IsDir() {
 			subname = srtp
+		} else {
+			// Pull the subs from the media file, or make blank ones so -vf subtitles doesnt freak out
+			ExtractSubsOrBlank(filename, sub_index, extsub)
+			subname = extsub.Name()
 		}
 	}
+	subname = strings.ReplaceAll(subname, "'", "\\'")
+	subname = strings.ReplaceAll(subname, "[", "\\[")
+	subname = strings.ReplaceAll(subname, "]", "\\]")
+	subname = strings.ReplaceAll(subname, ":", "\\:")
 
 	runcmd := []string{
 		"-i", filename,
@@ -86,24 +111,16 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		"-cpu-used", "8",
 		"-row-mt", "1",
 		"-f", "webm",
+		"-filter:v", fmt.Sprintf("subtitles=filename='%s'", subname),
+		"pipe:1",
 	}
-
-	if !r.Form.Has("nosub") {
-		vf := fmt.Sprintf("subtitles=filename='%s'", subname)
-		if r.Form.Has("si") {
-			vf = fmt.Sprintf("%s:si=%s", vf, r.FormValue("si"))
-		}
-		runcmd = append(runcmd, "-vf", vf)
-	}
-
-	// Final output arg
-	runcmd = append(runcmd, "pipe:1")
 
 	w.Header().Set("Content-Type", "video/webm;codecs=\"vp8,vorbis\"")
 	w.Header().Set("Content-Disposition", "inline")
 	w.Header()["Content-Length"] = nil // Stop go helpfully setting it to 0
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
+	log.Println(FfmpegBinary, runcmd)
 
 	cmd := exec.CommandContext(r.Context(), FfmpegBinary, runcmd...)
 	cmd.Stdout = w
@@ -112,6 +129,21 @@ func encodeVideo(w http.ResponseWriter, r *http.Request) {
 		log.Println(FfmpegBinary, runcmd)
 		log.Println(err)
 	}
+}
+
+func TestSubtitleStream(filename string, stream int) bool {
+	// ffmpeg -i video -c copy -map 0:s:0 -frames:s 1 -f null - -v 0 -hide_banner
+	runcmd := []string{
+		"-i", filename,
+		"-loglevel", "panic",
+		"-c", "copy",
+		"-map", "0:s:0",
+		"-frames:s", "1",
+		"-f", "null",
+		"-",
+	}
+	cmd := exec.CommandContext(context.Background(), FfmpegBinary, runcmd...)
+	return cmd.Run() == nil
 }
 
 func logRequest(handler http.Handler) http.Handler {
@@ -138,8 +170,5 @@ func main() {
 	}
 
 	http.HandleFunc("/", index)
-	http.HandleFunc("/list", list)
-	http.HandleFunc("/video", encodeVideo)
-
 	log.Fatal(http.ListenAndServe(*listen, logRequest(http.DefaultServeMux)))
 }

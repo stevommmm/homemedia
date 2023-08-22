@@ -16,17 +16,32 @@
 			font-size: 22px;
 			font-family: Verdana, Arial, Helvetica, sans-serif;
 		}
-		form {
+		.mediaitem {
+			display: block;
+			position: relative;
+			border-bottom: 1px solid #333;
+		}
+		.mediaitem > a {
+			display: inline-block;
+			padding: 0.5rem 1rem;
+			color: inherit;
+			text-decoration: none;
+		}
+		.mediaitem > .direct {
+			float: right;
+		}
+		a:visited {
+			color: green;
+		}
+		.content {
 			width: 100%;
+			position: relative;
 			margin: 0 auto;
 			font-size: 1rem;
-			padding: 0.5rem;
-			display: flex;
-			flex-wrap: wrap;
-			justify-content: space-between;
-			gap: 0.5rem;
+			padding: 2rem;
+			display: block;
 		}
-		label, input, select, button {
+		input, button {
 			display: inline-block;
 			padding: 0.6rem 1rem;
 			border: 1px solid #000;
@@ -36,38 +51,13 @@
 			line-height: 1.2rem;
 			font-size: 1rem;
 		}
-		label > input {
-			margin-right: 1rem;
-			padding: 0;
-			color: #fff;
-			border: none;
-			background-color: transparent;
-		}
-		input[type=number] {
-			width: 3rem;
-		}
-		input[type=submit], button#stop {
-			margin: 0;
-			flex-basis: 10%;
-			padding: 0.7rem 2rem;
-			cursor: pointer;
-		}
-		input[type=submit] {
-			background-color: #363;
-		}
 		button#stop {
 			background-color: #633;
-		}
-		select {
-			font-size: 1rem;
-			width: 40rem;
-			flex-basis: 40%;
-			flex-grow: 1;
 		}
 		video {
 			width: 100%;
 			background-color: #000;
-			display: block;
+			display: none;
 			height: auto;
 			max-height: 100vh;
 			margin: 0 auto;
@@ -76,88 +66,89 @@
 	</style>
 </head>
 <body>
+	<!-- poster tag for random image? -->
 	<video preload=none controls></video>
-	<form>
-		<select name=fn></select>
-		<input type=text id=filter placeholder="Filter" />
-		<label><input type=checkbox name=nosub value=1>No Subs</label>
-		<label><input type=checkbox id=autonext>Auto Next</label>
-		<label><input type=number min=0 name=si value="0">Sub index</label>
-		<input type=submit value="Enqueue Video" />
-		<button type=button id=stop>Stop</button>
-	</form>
+	<div class=content>
+		<div class=controls>
+			<input type=number min=0 id=si placeholder="Subtitle Index">
+			<button type=button id=fwd>&gt;&gt;</button>
+			<button type=button id=back>&lt;&lt;</button>
+			<button type=button id=stop>Stop</button>
+		</div>
+	</div>
 	<script type="text/javascript">
-		window.addEventListener('load', async () => {
-			const response = await fetch('/list');
-			let data = await response.text();
+		const content = document.querySelector('.content');
+		const v = document.querySelector('video');
+		const stopb = document.querySelector('button#stop')
+		const fwdb = document.querySelector('button#fwd')
+		const backb = document.querySelector('button#back')
+		const subindex = document.querySelector('input#si')
 
-			const v = document.querySelector('video');
-			const form = document.querySelector('form');
-			const sel = document.querySelector('select');
-			const filter = document.querySelector('input#filter');
-			const stopb = document.querySelector('button#stop')
-			const lastplayed = localStorage.getItem("lastplayed");
-
-
-			for (let line of data.split('\n')) {
-				if (line == "") {
-					continue;
-				}
-				let o = document.createElement('option');
-				o.value = line;
-				if (lastplayed === line) {
-					o.selected = true;
-				}
-				o.appendChild(document.createTextNode(line));
-				sel.appendChild(o);
+		stopb.addEventListener('click', (ev) => {
+			v.pause();
+			v.currentTime = 0;
+			while (v.firstChild) {
+				v.removeChild(v.lastChild);
 			}
+			v.load();
+			v.style.display = "none";
+			history.pushState({},"", "/");
+		});
 
-			filter.addEventListener('change', (ev) => {
-				for (var i=sel.options.length-1; i>=0; i--) {
-					if (sel.options[i].text.toLowerCase().indexOf(filter.value) == -1){
-						sel.options[i].style.display = 'none';
-					} else {
-						sel.options[i].style.display = 'inherit';
-					}
+		fwdb.addEventListener('click', (ev) => {
+			v.currentTime += 10;
+		});
+		backb.addEventListener('click', (ev) => {
+			v.currentTime -= 10;
+		});
+
+		function videoHandler(e) {
+			e.preventDefault();
+			history.pushState({},"", e.target);
+
+			let src=document.createElement('source');
+			src.src=`${e.target}?si=${subindex.value}`;
+			src.type='video/webm';
+			src.addEventListener('error', (ev) => { alert("Cant load media, bad subtitles?") });
+			v.addEventListener("loadeddata", (ev) => {
+				v.play();
+			});
+
+			v.pause();
+			v.replaceChildren(src);
+			v.load();
+			v.style.display = "block";
+			window.scrollTo(0, 0);
+		}
+
+		async function xmlreq(method, url) {
+			const x = new DOMParser();
+			const e = await fetch(url, {method: method});
+
+			return x.parseFromString(await e.text(), "text/xml");
+		}
+
+		window.addEventListener('load', async () => {
+			let doc = await xmlreq('PROPFIND', '/');
+			for (n of doc.querySelectorAll('response')) {
+				let href = n.querySelector('href').textContent;
+				let display = n.querySelector('displayname').textContent;
+				let ctype = n.querySelector('getcontenttype');
+
+				if (ctype !== null && ctype.textContent.startsWith('video/')) {
+					let p = document.createElement('p');
+					p.classList.add("mediaitem");
+
+					let inline = document.createElement('a');
+					inline.classList.add('inline');
+					inline.href = href;
+					inline.appendChild(document.createTextNode(display));
+					inline.addEventListener('click', videoHandler);
+					p.appendChild(inline);
+
+					content.appendChild(p);
 				}
-			});
-
-			stopb.addEventListener('click', (ev) => {
-				v.pause();
-				v.currentTime = 0;
-				while (v.firstChild) {
-					v.removeChild(v.lastChild);
-				}
-				v.load();
-			});
-
-			form.addEventListener('submit', (e) => {
-				e.preventDefault();
-
-				const fd = new FormData(e.target);
-				const ud = new URLSearchParams(fd);
-
-				let src=document.createElement('source');
-				src.src=`/video?${ud.toString()}`;
-				src.type='video/webm';
-				src.addEventListener('error', (ev) => { alert("Cant load media, bad subtitles?") });
-
-				
-				v.addEventListener("loadeddata", (ev) => {
-					v.play();
-					localStorage.setItem("lastplayed", fd.get('fn'));
-				});
-				v.addEventListener("ended", (event) => { 
-					if (document.querySelector('#autonext').checked === true) {
-						sel.selectedIndex++;
-						form.requestSubmit();
-					}
-				});
-
-				v.pause();
-				v.replaceChildren(src);
-				v.load();
-			});
+			}
 		});
 	</script>
 </body>
