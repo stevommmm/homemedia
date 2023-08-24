@@ -17,21 +17,31 @@
 			font-family: Verdana, Arial, Helvetica, sans-serif;
 		}
 		.mediaitem {
-			display: block;
 			position: relative;
-			border-bottom: 1px solid #333;
+			border: 1px solid #111;
+			background: #222;
+			width: 300px;
+			margin: 0;
 		}
 		.mediaitem > a {
-			display: inline-block;
-			padding: 0.5rem 1rem;
-			color: inherit;
+			color: #fff;
 			text-decoration: none;
+			display: block;
+			text-shadow: 1px 1px 2px black;
+			font-weight: 600;
+			padding: 1rem;
+			overflow-wrap: anywhere;
+			position: absolute;
+			top: 0;
+			left: 0;
 		}
-		.mediaitem > .direct {
-			float: right;
+		.mediaitem > img {
+			width: 100%;
+			aspect-ratio: 2 / 1;
+			display: block;
 		}
-		a:visited {
-			color: green;
+		.mediaitem > a:visited {
+			color: #afa;
 		}
 		.content {
 			width: 100%;
@@ -39,7 +49,14 @@
 			margin: 0 auto;
 			font-size: 1rem;
 			padding: 2rem;
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.3rem;
+			justify-content: space-around;
+		}
+		.controls {
 			display: block;
+			width: 100%;
 		}
 		input, button {
 			display: inline-block;
@@ -50,6 +67,9 @@
 			color: #efefef;
 			line-height: 1.2rem;
 			font-size: 1rem;
+		}
+		input[type=number] {
+			width: 8rem;
 		}
 		button#stop {
 			background-color: #633;
@@ -70,7 +90,7 @@
 	<video preload=none controls></video>
 	<div class=content>
 		<div class=controls>
-			<input type=number min=0 id=si placeholder="Subtitle Index">
+			<input type=number min=0 id=si placeholder="Sub Index">
 			<button type=button id=fwd>&gt;&gt;</button>
 			<button type=button id=back>&lt;&lt;</button>
 			<button type=button id=stop>Stop</button>
@@ -83,6 +103,13 @@
 		const fwdb = document.querySelector('button#fwd')
 		const backb = document.querySelector('button#back')
 		const subindex = document.querySelector('input#si')
+
+		const propfind = `<?xml version="1.0" encoding="utf-8" ?>
+		<propfind xmlns="DAV:">
+			<prop>
+				<getcontenttype xmlns="DAV:"/>
+			</prop>
+		</propfind>`
 
 		stopb.addEventListener('click', (ev) => {
 			v.pause();
@@ -104,11 +131,12 @@
 
 		function videoHandler(e) {
 			e.preventDefault();
-			history.pushState({},"", e.target);
+			history.pushState({},"", e.target.href);
+			console.log(e);
 
 			let src=document.createElement('source');
-			src.src=`${e.target}?si=${subindex.value}`;
-			src.type='video/webm';
+			src.src=`${e.target.href}?si=${subindex.value}`;
+			// src.type='video/webm';
 			src.addEventListener('error', (ev) => { alert("Cant load media, bad subtitles?") });
 			v.addEventListener("loadeddata", (ev) => {
 				v.play();
@@ -121,29 +149,34 @@
 			window.scrollTo(0, 0);
 		}
 
-		async function xmlreq(method, url) {
+		async function xmlreq(method, url, body={}) {
 			const x = new DOMParser();
-			const e = await fetch(url, {method: method});
+			body['method'] = method;
+			const e = await fetch(url, body);
 
 			return x.parseFromString(await e.text(), "text/xml");
 		}
 
 		window.addEventListener('load', async () => {
-			let doc = await xmlreq('PROPFIND', '/');
+			let doc = await xmlreq('PROPFIND', '/', {body: propfind});
 			for (n of doc.querySelectorAll('response')) {
 				let href = n.querySelector('href').textContent;
-				let display = n.querySelector('displayname').textContent;
+				let display = decodeURIComponent(href);
 				let ctype = n.querySelector('getcontenttype');
 
 				if (ctype !== null && ctype.textContent.startsWith('video/')) {
 					let p = document.createElement('p');
 					p.classList.add("mediaitem");
 
+					let i = document.createElement('img');
+					i.src = `${href}?thumb=1`;
+					i.loading = "lazy";
+					p.appendChild(i);
+
 					let inline = document.createElement('a');
-					inline.classList.add('inline');
-					inline.href = href;
+					inline.href = `${href}?encode=1`;
 					inline.appendChild(document.createTextNode(display));
-					inline.addEventListener('click', videoHandler);
+					inline.addEventListener('click', videoHandler, true);
 					p.appendChild(inline);
 
 					content.appendChild(p);
