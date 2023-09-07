@@ -1,14 +1,17 @@
 package main
 
 import (
-	"bytes"
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"crypto/sha1"
 	"log"
 	"mime"
 	"net/http"
 	"os"
+	"io"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -16,7 +19,9 @@ import (
 	"strings"
 	"sync"
 
-	bolt "go.etcd.io/bbolt"
+	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anacrolix/torrent/storage"
 	"golang.org/x/net/webdav"
 
 	_ "embed"
@@ -41,10 +46,15 @@ var (
 	DataDirectory string
 	FfmpegBinary  string
 	davHandler    *webdav.Handler
-	db            *bolt.DB
-	thumbbucket   = []byte("thumbs")
 	thumblock     sync.Mutex
+	tclient       *torrent.Client
+	tlock         sync.Mutex
 )
+
+type TorrentConfig struct {
+	Magnet string `json:"magnet"`
+	Name   string `json:"name"`
+}
 
 func index(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
@@ -52,6 +62,13 @@ func index(w http.ResponseWriter, r *http.Request) {
 		w.Write(indexpage)
 		return
 	}
+
+	if r.URL.Path == "/magnets.json" {
+		w.Header().Set("content-type", "application/json")
+		ManageConfig(w, r)
+		return
+	}
+
 	if r.Method == http.MethodGet {
 		ex := path.Ext(r.URL.Path)
 		if strings.HasPrefix(mime.TypeByExtension(ex), "video/") {
@@ -65,42 +82,35 @@ func index(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
 	davHandler.ServeHTTP(w, r)
 }
 
 func thumbnailHandler(filename string, w http.ResponseWriter, r *http.Request) {
-	if err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(thumbbucket)
-		w.Header().Set("Content-Type", "image/png")
-		if b == nil {
-			w.Write(blankimg)
-			return nil
-		}
-		thumb := b.Get([]byte(filename))
-		if thumb != nil {
-			// Cache good thumbnails
-			w.Header().Set("Cache-Control", "public, max-age=604800")
-			w.Write(thumb)
-		} else {
-			go ExtractFrame(filename)
-			w.Write(blankimg)
-		}
-		return nil
-	}); err != nil {
-		log.Println(err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	sum := sha1.Sum([]byte(filename))
+	path := filepath.Join(os.TempDir(),
+		fmt.Sprintf("thumb%s.png", hex.EncodeToString(sum[:])),
+	)
+
+	w.Header().Set("Content-Type", "image/png")
+
+	f, err := os.Open(path)
+	if err != nil {
+		w.Write(blankimg)
+		go ExtractFrame(filename, path)
+		return
 	}
+	defer f.Close()
+	w.Header().Set("Cache-Control", "public, max-age=604800")
+	io.Copy(w, f)
 }
 
-func ExtractFrame(filename string) {
+func ExtractFrame(filename, dest string) {
 	thumblock.Lock()
 	defer thumblock.Unlock()
-	var buf bytes.Buffer
 	// ffmpeg -ss 00:00:04 -i input.mp4 -frames:v 1 screenshot.png
 	framecmd := exec.CommandContext(context.Background(),
 		FfmpegBinary,
-		// "-ss", "50",
+		"-n",
 		"-i", filename,
 		"-loglevel", "error",
 		"-vf", "fps=1,thumbnail=n=30,scale=w=200:h=100",
@@ -108,22 +118,10 @@ func ExtractFrame(filename string) {
 		"-c", "png",
 		"-f", "image2",
 		"-update", "1",
-		"pipe:1")
-	framecmd.Stdout = &buf
+		dest)
 	framecmd.Stderr = os.Stderr
-	framecmd.Run()
-
-	if err := db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(thumbbucket)
-		if err != nil {
-			return err
-		}
-		if err := b.Put([]byte(filename), buf.Bytes()); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		log.Println(err)
+	if err := framecmd.Run(); err != nil {
+		return
 	}
 }
 
@@ -234,6 +232,105 @@ func EncodeVideo(filename string, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func ManageConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		var known []TorrentConfig
+		for _, t := range tclient.Torrents() {
+			known = append(known, TorrentConfig{
+				Magnet: t.Metainfo().Magnet(nil, nil).String(),
+				Name:   t.Name(),
+			})
+		}
+		enc := json.NewEncoder(w)
+		enc.Encode(known)
+
+	case http.MethodPost:
+		r.ParseForm()
+		log.Println(r.PostForm)
+
+		for _, t := range tclient.Torrents() {
+			l := t.Metainfo().Magnet(nil, nil).String()
+			if !r.PostForm.Has(l) {
+				log.Printf("Dropping %s\n", t.Name())
+				t.Drop()
+			}
+		}
+
+		for tc, _ := range r.PostForm {
+			if tc == "new" {
+				tc = r.PostForm.Get("new")
+			}
+			if tc == "" {
+				continue
+			}
+			m, err := metainfo.ParseMagnetUri(tc)
+			if err != nil {
+				log.Println("Cant parse magnet link", err)
+				continue
+			}
+			if _, ok := tclient.Torrent(m.InfoHash); ok {
+				continue
+			}
+			t, err := tclient.AddMagnet(tc)
+			if err != nil {
+				log.Println("Cant add magnet link", err)
+				continue
+			}
+			<-t.GotInfo()
+			t.DownloadAll()
+			log.Printf("Added %s\n", t.Name())
+		}
+		http.Redirect(w, r, "/", 303)
+		go SaveMagnets()
+	default:
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+}
+
+func LoadMagnets() {
+	tlock.Lock()
+	defer tlock.Unlock()
+	f, err := os.Open(filepath.Join(DataDirectory, "magnets.json"))
+	if err != nil {
+		return
+	}
+	var magnets []string
+	if err := json.NewDecoder(f).Decode(&magnets); err != nil {
+		return
+	}
+
+	for _, magnet := range magnets {
+		t, err := tclient.AddMagnet(magnet)
+		if err != nil {
+			log.Println("Cant add magnet link", err)
+			continue
+		}
+		<-t.GotInfo()
+		t.DownloadAll()
+		log.Printf("Added %s\n", t.Name())
+	}
+}
+
+func SaveMagnets() {
+	tlock.Lock()
+	defer tlock.Unlock()
+	f, err := os.OpenFile(filepath.Join(DataDirectory, "magnets.json"),
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0700)
+	if err != nil {
+		return
+	}
+	var magnets []string
+
+	for _, t := range tclient.Torrents() {
+		magnets = append(magnets, t.Metainfo().Magnet(nil, nil).String())
+	}
+
+	if err := json.NewEncoder(f).Encode(&magnets); err != nil {
+		return
+	}
+}
+
 func logRequest(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s %s %s\n", r.RemoteAddr, r.Method, r.URL)
@@ -247,16 +344,17 @@ func main() {
 	listen := flag.String("listen", ":8080", "Webserver listen address.")
 	flag.Parse()
 
-	if bb, err := bolt.Open(filepath.Join(DataDirectory, "thumbnails.db"), 0600, nil); err == nil {
-		bb.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists(thumbbucket)
-			return err
-		})
-		db = bb
+	tconf := torrent.NewDefaultClientConfig()
+	tconf.DataDir = DataDirectory
+	tconf.DefaultStorage = storage.NewFile(DataDirectory)
+	if c, err := torrent.NewClient(tconf); err == nil {
+		tclient = c
 	} else {
-		log.Fatalf("Can't open thumbnail db: %q", err)
+		log.Fatal(err)
 	}
-	defer db.Close()
+	defer tclient.Close()
+
+	LoadMagnets()
 
 	davHandler = &webdav.Handler{
 		FileSystem: webdav.Dir(DataDirectory),
@@ -269,5 +367,6 @@ func main() {
 	}
 
 	http.HandleFunc("/", index)
+	log.Println("Listening....")
 	log.Fatal(http.ListenAndServe(*listen, logRequest(http.DefaultServeMux)))
 }

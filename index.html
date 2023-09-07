@@ -16,12 +16,52 @@
 			font-size: 22px;
 			font-family: Verdana, Arial, Helvetica, sans-serif;
 		}
+		.content {
+			width: 100%;
+			position: relative;
+			margin: 0 auto;
+			font-size: 1rem;
+			padding: 2rem;
+			display: block;
+		}
+		video {
+			width: 100%;
+			background-color: #000;
+			display: none;
+			height: auto;
+			max-height: 100vh;
+			margin: 0 auto;
+			resize: both;
+		}
+		.controls, .magnets {
+			display: inline-block;
+			padding: .5rem;
+			margin: .5rem;
+			background: #1a1a1a;
+			border: 1px solid black;
+			border-radius: 4px;
+			vertical-align: top;
+		}
+		.magnets label:after {
+			content: "\a";
+			white-space: pre;
+		}
+		input, button {
+			background: rgba(0,0,0,0.5);
+			border-radius: 4px;
+			border: 1px solid black;
+			color: inherit;
+			font-size: inherit;
+			padding: 0.3rem 1rem;
+			margin: 0.3rem;
+		}
 		.mediaitem {
 			position: relative;
+			display: inline-block;
 			border: 1px solid #111;
 			background: #222;
 			width: 300px;
-			margin: 0;
+			margin: 2px;
 		}
 		.mediaitem > a {
 			color: #fff;
@@ -43,46 +83,6 @@
 		.mediaitem > a:visited {
 			color: #afa;
 		}
-		.content {
-			width: 100%;
-			position: relative;
-			margin: 0 auto;
-			font-size: 1rem;
-			padding: 2rem;
-			display: flex;
-			flex-wrap: wrap;
-			gap: 0.3rem;
-			justify-content: space-around;
-		}
-		.controls {
-			display: block;
-			width: 100%;
-		}
-		input, button {
-			display: inline-block;
-			padding: 0.6rem 1rem;
-			border: 1px solid #000;
-			border-radius: 3px;
-			background-color: #333;
-			color: #efefef;
-			line-height: 1.2rem;
-			font-size: 1rem;
-		}
-		input[type=number] {
-			width: 8rem;
-		}
-		button#stop {
-			background-color: #633;
-		}
-		video {
-			width: 100%;
-			background-color: #000;
-			display: none;
-			height: auto;
-			max-height: 100vh;
-			margin: 0 auto;
-			resize: both;
-		}
 	</style>
 </head>
 <body>
@@ -95,6 +95,10 @@
 			<button type=button id=back>&lt;&lt;</button>
 			<button type=button id=stop>Stop</button>
 		</div>
+		<form class=magnets method=post action=/magnets.json>
+			<input type="submit">
+			<input type="text" name="new" placeholder="magnet:?xt=..."><br>
+		</form>
 	</div>
 	<script type="text/javascript">
 		const content = document.querySelector('.content');
@@ -103,6 +107,7 @@
 		const fwdb = document.querySelector('button#fwd')
 		const backb = document.querySelector('button#back')
 		const subindex = document.querySelector('input#si')
+		const magnets = document.querySelector('.magnets')
 
 		const propfind = `<?xml version="1.0" encoding="utf-8" ?>
 		<propfind xmlns="DAV:">
@@ -132,7 +137,8 @@
 		function videoHandler(e) {
 			e.preventDefault();
 			history.pushState({},"", e.target.href);
-			console.log(e);
+
+			v.setAttribute('poster', `${e.target.href}?thumb=1`);
 
 			let src=document.createElement('source');
 			src.src=`${e.target.href}?si=${subindex.value}`;
@@ -158,6 +164,25 @@
 		}
 
 		window.addEventListener('load', async () => {
+			const e = await fetch("/magnets.json");
+			let data = await e.json();
+			if (data !== null) {
+				for (let m of data) {
+					let check = document.createElement('input');
+					check.type = "checkbox";
+					check.name = m["magnet"];
+					check.value = "keep";
+					check.checked = true;
+
+					let name = document.createElement('label');
+					name.for = check.name;
+					name.appendChild(document.createTextNode(m["name"]));
+
+					magnets.appendChild(check);
+					magnets.appendChild(name);
+				}
+			}
+
 			let doc = await xmlreq('PROPFIND', '/', {body: propfind});
 			for (n of doc.querySelectorAll('response')) {
 				let href = n.querySelector('href').textContent;
