@@ -62,6 +62,8 @@
 			background: #222;
 			width: 300px;
 			margin: 2px;
+			background-color: #141414;
+			vertical-align: top;
 		}
 		.mediaitem > a {
 			color: #fff;
@@ -69,11 +71,8 @@
 			display: block;
 			text-shadow: 1px 1px 2px black;
 			font-weight: 600;
-			padding: 1rem;
+			padding: 0.2rem;
 			overflow-wrap: anywhere;
-			position: absolute;
-			top: 0;
-			left: 0;
 		}
 		.mediaitem > img {
 			width: 100%;
@@ -99,6 +98,7 @@
 			<input type="submit">
 			<input type="text" name="new" placeholder="magnet:?xt=..."><br>
 		</form>
+		<br>
 	</div>
 	<script type="text/javascript">
 		const content = document.querySelector('.content');
@@ -184,7 +184,9 @@
 			}
 
 			let doc = await xmlreq('PROPFIND', '/', {body: propfind});
-			for (n of doc.querySelectorAll('response')) {
+			let responses = Array.from(doc.querySelectorAll('response')).filter((a) => !a.querySelector('href').textContent.includes("/."));
+			responses.sort((a, b) => a.querySelector('href').textContent.localeCompare(b.querySelector('href').textContent));
+			for (n of responses) {
 				let href = n.querySelector('href').textContent;
 				let display = decodeURIComponent(href);
 				let ctype = n.querySelector('getcontenttype');
@@ -200,7 +202,7 @@
 
 					let inline = document.createElement('a');
 					inline.href = `${href}?encode=1`;
-					inline.appendChild(document.createTextNode(display));
+					inline.appendChild(document.createTextNode(display.replaceAll(/\[.*?\]/gi, '')));
 					inline.addEventListener('click', videoHandler, true);
 					p.appendChild(inline);
 
