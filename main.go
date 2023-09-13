@@ -231,7 +231,7 @@ func EncodeVideo(filename string, w http.ResponseWriter, r *http.Request) {
 		"-cpu-used", "8",
 		"-row-mt", "1",
 		"-f", "webm",
-		"-filter:v", fmt.Sprintf("subtitles=filename='%s':force_style='Fontname=Helvetica Neue,PrimaryColour=&H00d5ff'", subname),
+		"-filter:v", fmt.Sprintf("subtitles=filename='%s':force_style='Fontname=Roboto,PrimaryColour=&H00d5ff'", subname),
 		"pipe:1",
 	}
 
