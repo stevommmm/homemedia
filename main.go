@@ -201,9 +201,28 @@ func EncodeVideo(filename string, w http.ResponseWriter, r *http.Request) {
 	subname = strings.ReplaceAll(subname, "]", "\\]")
 	subname = strings.ReplaceAll(subname, ":", "\\:")
 
+	audio_index := r.FormValue("ai")
+	if audio_index == "" {
+		audio_index = "0"
+	}
+
+	if _, err := strconv.Atoi(audio_index); err != nil {
+		log.Println("Bad audio index passed.")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	seek := r.FormValue("ss")
+	if seek == "" {
+		seek = "0"
+	}
+
 	runcmd := []string{
+		"-ss", seek,
 		"-i", filename,
 		"-loglevel", "error",
+		"-map", "0:v:0",
+		"-map", fmt.Sprintf("0:a:%s?", audio_index),
 		"-crf", "35",
 		"-c:a", "libopus",
 		"-af", "aformat=channel_layouts='7.1|5.1|stereo'",
@@ -212,7 +231,7 @@ func EncodeVideo(filename string, w http.ResponseWriter, r *http.Request) {
 		"-cpu-used", "8",
 		"-row-mt", "1",
 		"-f", "webm",
-		"-filter:v", fmt.Sprintf("subtitles=filename='%s':force_style='PrimaryColour=&H00d5ff'", subname),
+		"-filter:v", fmt.Sprintf("subtitles=filename='%s':force_style='Fontname=Helvetica Neue,PrimaryColour=&H00d5ff'", subname),
 		"pipe:1",
 	}
 

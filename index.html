@@ -90,6 +90,7 @@
 	<div class=content>
 		<div class=controls>
 			<input type=number min=0 id=si placeholder="Sub Index">
+			<input type=number min=0 id=ai placeholder="Audio Index">
 			<button type=button id=fwd>&gt;&gt;</button>
 			<button type=button id=back>&lt;&lt;</button>
 			<button type=button id=stop>Stop</button>
@@ -107,6 +108,7 @@
 		const fwdb = document.querySelector('button#fwd')
 		const backb = document.querySelector('button#back')
 		const subindex = document.querySelector('input#si')
+		const audioindex = document.querySelector('input#ai')
 		const magnets = document.querySelector('.magnets')
 
 		const propfind = `<?xml version="1.0" encoding="utf-8" ?>
@@ -137,12 +139,14 @@
 		function videoHandler(e) {
 			e.preventDefault();
 			history.pushState({},"", e.target.href);
-
-			v.setAttribute('poster', `${e.target.href}?thumb=1`);
-
 			let src=document.createElement('source');
-			src.src=`${e.target.href}?si=${subindex.value}`;
-			// src.type='video/webm';
+
+			videoFromUrl(`${e.target.href}?si=${subindex.value}&ai=${audioindex.value}`);
+		}
+
+		function videoFromUrl(ref) {
+			let src=document.createElement('source');
+			src.src=ref;
 			src.addEventListener('error', (ev) => { alert("Cant load media, bad subtitles?") });
 			v.addEventListener("loadeddata", (ev) => {
 				v.play();
