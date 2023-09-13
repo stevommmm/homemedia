@@ -19,9 +19,9 @@
 		.content {
 			width: 100%;
 			position: relative;
-			margin: 0 auto;
+			margin: 0;
 			font-size: 1rem;
-			padding: 2rem;
+			padding: 1rem;
 			display: block;
 		}
 		video {
@@ -36,7 +36,7 @@
 		.controls, .magnets {
 			display: inline-block;
 			padding: .5rem;
-			margin: .5rem;
+			margin: 2px;
 			background: #1a1a1a;
 			border: 1px solid black;
 			border-radius: 4px;
@@ -82,6 +82,15 @@
 		.mediaitem > a:visited {
 			color: #afa;
 		}
+		@media (max-width: 500px) {
+			.content {
+				padding: 0;
+			}
+			.mediaitem {
+				width: 100%;
+				margin: 2px 0;
+			}
+		}
 	</style>
 </head>
 <body>
@@ -89,6 +98,7 @@
 	<video preload=none controls></video>
 	<div class=content>
 		<div class=controls>
+			<input type=number min=0 id=ss placeholder="Seek">
 			<input type=number min=0 id=si placeholder="Sub Index">
 			<input type=number min=0 id=ai placeholder="Audio Index">
 			<button type=button id=fwd>&gt;&gt;</button>
@@ -107,6 +117,7 @@
 		const stopb = document.querySelector('button#stop')
 		const fwdb = document.querySelector('button#fwd')
 		const backb = document.querySelector('button#back')
+		const seeksec = document.querySelector('input#ss')
 		const subindex = document.querySelector('input#si')
 		const audioindex = document.querySelector('input#ai')
 		const magnets = document.querySelector('.magnets')
@@ -138,10 +149,11 @@
 
 		function videoHandler(e) {
 			e.preventDefault();
-			history.pushState({},"", e.target.href);
+			let url = `${e.target.href}?ss=${seeksec.value}&si=${subindex.value}&ai=${audioindex.value}`;
+			history.pushState({},"", url);
 			let src=document.createElement('source');
 
-			videoFromUrl(`${e.target.href}?si=${subindex.value}&ai=${audioindex.value}`);
+			videoFromUrl(url);
 		}
 
 		function videoFromUrl(ref) {
