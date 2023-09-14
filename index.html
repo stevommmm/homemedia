@@ -137,7 +137,6 @@
 			}
 			v.load();
 			v.style.display = "none";
-			history.pushState({},"", "/");
 		});
 
 		fwdb.addEventListener('click', (ev) => {
@@ -149,8 +148,10 @@
 
 		function videoHandler(e) {
 			e.preventDefault();
+			let cur = window.location.href;
 			let url = `${e.target.href}?ss=${seeksec.value}&si=${subindex.value}&ai=${audioindex.value}`;
-			history.pushState({},"", url);
+			history.replaceState({},"", e.target.href);
+			history.replaceState({},"", cur);
 			let src=document.createElement('source');
 
 			videoFromUrl(url);
