@@ -82,6 +82,9 @@
 		.mediaitem > a:visited {
 			color: #afa;
 		}
+		.watched {
+			filter: grayscale();
+		}
 		@media (max-width: 500px) {
 			.content {
 				padding: 0;
@@ -126,6 +129,7 @@
 		<propfind xmlns="DAV:">
 			<prop>
 				<getcontenttype xmlns="DAV:"/>
+				<getlastmodified xmlns="DAV:"/>
 			</prop>
 		</propfind>`
 
@@ -207,10 +211,15 @@
 				let href = n.querySelector('href').textContent;
 				let display = decodeURIComponent(href);
 				let ctype = n.querySelector('getcontenttype');
+				let lm = n.querySelector('getlastmodified');
 
 				if (ctype !== null && ctype.textContent.startsWith('video/')) {
 					let p = document.createElement('p');
 					p.classList.add("mediaitem");
+
+					if (new Date(lm.textContent).getTime() == 60000) {
+						p.classList.add("watched");
+					}
 
 					let i = document.createElement('img');
 					i.src = `${href}?thumb=1`;

@@ -2,22 +2,23 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"crypto/sha1"
+	"io"
 	"log"
 	"mime"
 	"net/http"
 	"os"
-	"io"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
@@ -242,12 +243,17 @@ func EncodeVideo(filename string, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	log.Println(FfmpegBinary, runcmd)
 
+	start := time.Now()
 	cmd := exec.CommandContext(r.Context(), FfmpegBinary, runcmd...)
 	cmd.Stdout = w
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		log.Println(FfmpegBinary, runcmd)
 		log.Println(err)
+	}
+	if time.Now().Sub(start).Minutes() >= 1 {
+		log.Println("marking as watched")
+		os.Chtimes(filename, time.Time{}, time.Unix(60, 0))
 	}
 }
 
