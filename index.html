@@ -107,6 +107,7 @@
 			<button type=button id=fwd>&gt;&gt;</button>
 			<button type=button id=back>&lt;&lt;</button>
 			<button type=button id=stop>Stop</button>
+			<button type=button id=retry>Retry</button>
 		</div>
 		<form class=magnets method=post action=/magnets.json>
 			<input type="submit">
@@ -118,6 +119,7 @@
 		const content = document.querySelector('.content');
 		const v = document.querySelector('video');
 		const stopb = document.querySelector('button#stop')
+		const retryb = document.querySelector('button#retry')
 		const fwdb = document.querySelector('button#fwd')
 		const backb = document.querySelector('button#back')
 		const seeksec = document.querySelector('input#ss')
@@ -143,6 +145,13 @@
 			v.style.display = "none";
 		});
 
+		retryb.addEventListener('click', (ev) => {
+			let cur = new URL(v.childNodes[0].src);
+			let url = `${cur.pathname}?encode=1&ss=${seeksec.value}&si=${subindex.value}&ai=${audioindex.value}`;
+
+			videoFromUrl(url);
+		});
+
 		fwdb.addEventListener('click', (ev) => {
 			v.currentTime += 10;
 		});
@@ -156,7 +165,6 @@
 			let url = `${e.target.href}?ss=${seeksec.value}&si=${subindex.value}&ai=${audioindex.value}`;
 			history.replaceState({},"", e.target.href);
 			history.replaceState({},"", cur);
-			let src=document.createElement('source');
 
 			videoFromUrl(url);
 		}
