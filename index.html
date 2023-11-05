@@ -46,7 +46,7 @@
 			content: "\a";
 			white-space: pre;
 		}
-		input, button {
+		input, button, select {
 			background: rgba(0,0,0,0.5);
 			border-radius: 4px;
 			border: 1px solid black;
@@ -102,8 +102,30 @@
 	<div class=content>
 		<div class=controls>
 			<input type=number min=0 id=ss placeholder="Seek">
-			<input type=number min=0 id=si placeholder="Sub Index">
-			<input type=number min=0 id=ai placeholder="Audio Index">
+			<select id=si>
+				<option value="0">Sub:0</option>
+				<option value="1">Sub:1</option>
+				<option value="2">Sub:2</option>
+				<option value="3">Sub:3</option>
+				<option value="4">Sub:4</option>
+				<option value="5">Sub:5</option>
+				<option value="6">Sub:6</option>
+				<option value="7">Sub:7</option>
+				<option value="8">Sub:8</option>
+				<option value="9">Sub:9</option>
+			</select>
+			<select id=ai>
+				<option value="0">Audio:0</option>
+				<option value="1">Audio:1</option>
+				<option value="2">Audio:2</option>
+				<option value="3">Audio:3</option>
+				<option value="4">Audio:4</option>
+				<option value="5">Audio:5</option>
+				<option value="6">Audio:6</option>
+				<option value="7">Audio:7</option>
+				<option value="8">Audio:8</option>
+				<option value="9">Audio:9</option>
+			</select>
 			<button type=button id=fwd>&gt;&gt;</button>
 			<button type=button id=back>&lt;&lt;</button>
 			<button type=button id=stop>Stop</button>
