@@ -103,7 +103,7 @@
 		<div class=controls>
 			<input type=number min=0 id=ss placeholder="Seek">
 			<select id=si>
-				<option value="0">Sub:0</option>
+				<option value="0" selected>Sub:0</option>
 				<option value="1">Sub:1</option>
 				<option value="2">Sub:2</option>
 				<option value="3">Sub:3</option>
@@ -115,7 +115,7 @@
 				<option value="9">Sub:9</option>
 			</select>
 			<select id=ai>
-				<option value="0">Audio:0</option>
+				<option value="0" selected>Audio:0</option>
 				<option value="1">Audio:1</option>
 				<option value="2">Audio:2</option>
 				<option value="3">Audio:3</option>
@@ -145,8 +145,8 @@
 		const fwdb = document.querySelector('button#fwd')
 		const backb = document.querySelector('button#back')
 		const seeksec = document.querySelector('input#ss')
-		const subindex = document.querySelector('input#si')
-		const audioindex = document.querySelector('input#ai')
+		const subindex = document.querySelector('select#si')
+		const audioindex = document.querySelector('select#ai')
 		const magnets = document.querySelector('.magnets')
 
 		const propfind = `<?xml version="1.0" encoding="utf-8" ?>
