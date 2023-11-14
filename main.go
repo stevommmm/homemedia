@@ -55,6 +55,7 @@ var (
 type TorrentConfig struct {
 	Magnet string `json:"magnet"`
 	Name   string `json:"name"`
+	Missing int64 `json:"missing"`
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
@@ -265,6 +266,7 @@ func ManageConfig(w http.ResponseWriter, r *http.Request) {
 			known = append(known, TorrentConfig{
 				Magnet: t.Metainfo().Magnet(nil, nil).String(),
 				Name:   t.Name(),
+				Missing: t.BytesMissing(),
 			})
 		}
 		enc := json.NewEncoder(w)

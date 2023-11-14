@@ -42,6 +42,12 @@
 			border-radius: 4px;
 			vertical-align: top;
 		}
+		.magnets label:before {
+			content: "[" attr(data-missing) "]";
+			color: #555;
+			font-family: monospace;
+			font-size: 0.7em;
+		}
 		.magnets label:after {
 			content: "\a";
 			white-space: pre;
@@ -228,6 +234,10 @@
 					let name = document.createElement('label');
 					name.for = check.name;
 					name.appendChild(document.createTextNode(m["name"]));
+					name.dataset.missing = m["missing"];
+					if (m["missing"] == "0") {
+						name.dataset.missing = "complete";
+					}
 
 					magnets.appendChild(check);
 					magnets.appendChild(name);
