@@ -128,10 +128,6 @@ func ExtractFrame(filename, dest string) {
 }
 
 func ExtractSubsOrBlank(filename, sub_index string, destination *os.File) {
-	if _, err := strconv.Atoi(sub_index); err != nil {
-		log.Println("Bad sub index passed.")
-		destination.Write(blanksubs)
-	}
 	subcmd := exec.CommandContext(context.Background(),
 		FfmpegBinary, "-y",
 		"-i", filename,
@@ -180,10 +176,12 @@ func EncodeVideo(filename string, w http.ResponseWriter, r *http.Request) {
 		sub_index = "0"
 	}
 
-	if _, err := strconv.Atoi(sub_index); err != nil {
-		log.Println("Bad sub index passed.")
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
+	if ! strings.HasPrefix(sub_index, "m:language:") {
+		if _, err := strconv.Atoi(sub_index); err != nil {
+			log.Println("Bad sub index passed.")
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Has local SRT file?
@@ -208,10 +206,12 @@ func EncodeVideo(filename string, w http.ResponseWriter, r *http.Request) {
 		audio_index = "0"
 	}
 
-	if _, err := strconv.Atoi(audio_index); err != nil {
-		log.Println("Bad audio index passed.")
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
+	if ! strings.HasPrefix(audio_index, "m:language:") {
+		if _, err := strconv.Atoi(audio_index); err != nil {
+			log.Println("Bad audio index passed.")
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
 	}
 
 	seek := r.FormValue("ss")

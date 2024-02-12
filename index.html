@@ -21,8 +21,9 @@
 			position: relative;
 			margin: 0;
 			font-size: 1rem;
-			padding: 1rem;
-			display: block;
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: left;
 		}
 		video {
 			width: 100%;
@@ -34,13 +35,12 @@
 			resize: both;
 		}
 		.controls, .magnets {
-			display: inline-block;
-			padding: .5rem;
-			margin: 2px;
+			display: block;
+			padding: 1rem;
 			background: #1a1a1a;
-			border: 1px solid black;
-			border-radius: 4px;
+			border-bottom: 1px solid black;
 			vertical-align: top;
+			font-size: 1rem;
 		}
 		.magnets label:before {
 			content: "[" attr(data-missing) "]";
@@ -63,13 +63,20 @@
 		}
 		.mediaitem {
 			position: relative;
-			display: inline-block;
-			border: 1px solid #111;
+			border: none;
 			background: #222;
 			width: 300px;
-			margin: 2px;
+			max-width: 360px;
+			margin: 0;
 			background-color: #141414;
-			vertical-align: top;
+			font-family: monospace;
+			flex-grow: 1;
+		}
+		.mediaitem:hover {
+			background-color: #333;
+		}
+		.mediaitem:last-child {
+			flex-grow: 1;
 		}
 		.mediaitem > a {
 			color: #fff;
@@ -105,44 +112,44 @@
 <body>
 	<!-- poster tag for random image? -->
 	<video preload=none controls></video>
-	<div class=content>
-		<div class=controls>
-			<input type=number min=0 id=ss placeholder="Seek">
-			<select id=si>
-				<option value="0" selected>Sub:0</option>
-				<option value="1">Sub:1</option>
-				<option value="2">Sub:2</option>
-				<option value="3">Sub:3</option>
-				<option value="4">Sub:4</option>
-				<option value="5">Sub:5</option>
-				<option value="6">Sub:6</option>
-				<option value="7">Sub:7</option>
-				<option value="8">Sub:8</option>
-				<option value="9">Sub:9</option>
-			</select>
-			<select id=ai>
-				<option value="0" selected>Audio:0</option>
-				<option value="1">Audio:1</option>
-				<option value="2">Audio:2</option>
-				<option value="3">Audio:3</option>
-				<option value="4">Audio:4</option>
-				<option value="5">Audio:5</option>
-				<option value="6">Audio:6</option>
-				<option value="7">Audio:7</option>
-				<option value="8">Audio:8</option>
-				<option value="9">Audio:9</option>
-			</select>
-			<button type=button id=fwd>&gt;&gt;</button>
-			<button type=button id=back>&lt;&lt;</button>
-			<button type=button id=stop>Stop</button>
-			<button type=button id=retry>Retry</button>
-		</div>
-		<form class=magnets method=post action=/magnets.json>
-			<input type="submit">
-			<input type="text" name="new" placeholder="magnet:?xt=..."><br>
-		</form>
-		<br>
+	<div class=controls>
+		<input type=number min=0 id=ss placeholder="Seek">
+		<select id=si>
+			<option value="m:language:eng" selected>Sub:eng</option>
+			<option value="0">Sub:0</option>
+			<option value="1">Sub:1</option>
+			<option value="2">Sub:2</option>
+			<option value="3">Sub:3</option>
+			<option value="4">Sub:4</option>
+			<option value="5">Sub:5</option>
+			<option value="6">Sub:6</option>
+			<option value="7">Sub:7</option>
+			<option value="8">Sub:8</option>
+			<option value="9">Sub:9</option>
+		</select>
+		<select id=ai>
+			<option value="m:language:eng" selected>Audio:eng</option>
+			<option value="0">Audio:0</option>
+			<option value="1">Audio:1</option>
+			<option value="2">Audio:2</option>
+			<option value="3">Audio:3</option>
+			<option value="4">Audio:4</option>
+			<option value="5">Audio:5</option>
+			<option value="6">Audio:6</option>
+			<option value="7">Audio:7</option>
+			<option value="8">Audio:8</option>
+			<option value="9">Audio:9</option>
+		</select>
+		<button type=button id=fwd>&gt;&gt;</button>
+		<button type=button id=back>&lt;&lt;</button>
+		<button type=button id=stop>Stop</button>
+		<button type=button id=retry>Retry</button>
 	</div>
+	<form class=magnets method=post action=/magnets.json>
+		<input type="submit">
+		<input type="text" name="new" placeholder="magnet:?xt=..."><br>
+	</form>
+	<div class=content></div>
 	<script type="text/javascript">
 		const content = document.querySelector('.content');
 		const v = document.querySelector('video');
